@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Healthcare Intelligence Digest — KOR</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #f0fdf4; color: #1a202c; }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #064e3b 0%, #0f766e 100%);
+            color: white; padding: 24px 32px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .header h1 { font-size: 24px; font-weight: 700; }
+        .header p { opacity: 0.85; font-size: 14px; margin-top: 4px; }
+        .header-actions { display: flex; gap: 12px; }
+        .btn {
+            padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer;
+            font-size: 14px; font-weight: 600; transition: all 0.2s;
+        }
+        .btn-primary { background: #14b8a6; color: white; }
+        .btn-primary:hover { background: #0d9488; }
+        .btn-hubspot { background: #ff7a59; color: white; }
+        .btn-hubspot:hover { background: #e5603d; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Status bar */
+        .status-bar {
+            background: #fff; padding: 12px 32px; border-bottom: 1px solid #e2e8f0;
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 13px; color: #64748b;
+        }
+        .status-bar .stats { display: flex; gap: 24px; }
+        .stat { display: flex; align-items: center; gap: 6px; }
+        .stat-num { font-weight: 700; color: #064e3b; font-size: 18px; }
+
+        /* Progress */
+        .progress-container { display: none; padding: 16px 32px; background: #ecfdf5; }
+        .progress-bar { height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
+        .progress-fill { height: 100%; background: #14b8a6; border-radius: 3px; transition: width 0.5s; width: 0%; }
+        .progress-text { margin-top: 8px; font-size: 13px; color: #475569; }
+
+        /* Filters */
+        .filters {
+            padding: 16px 32px; background: #fff; border-bottom: 1px solid #e2e8f0;
+            display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+        }
+        .filter-chip {
+            padding: 6px 14px; border-radius: 20px; font-size: 13px; cursor: pointer;
+            border: 1px solid #cbd5e1; background: #fff; transition: all 0.2s;
+        }
+        .filter-chip:hover { border-color: #0f766e; color: #0f766e; }
+        .filter-chip.active { background: #0f766e; color: white; border-color: #0f766e; }
+        .filter-label { font-size: 13px; color: #64748b; font-weight: 600; }
+
+        /* Main content */
+        .content { max-width: 1200px; margin: 0 auto; padding: 24px 32px; }
+
+        /* Segment groups */
+        .segment-group { margin-bottom: 32px; }
+        .segment-title {
+            font-size: 18px; font-weight: 700; color: #064e3b;
+            border-bottom: 2px solid #14b8a6; padding-bottom: 8px; margin-bottom: 16px;
+        }
+
+        /* Article cards */
+        .article-card {
+            background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 12px;
+            border-left: 4px solid #22c55e; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .article-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .article-card.score-high { border-left-color: #22c55e; }
+        .article-card.score-mid { border-left-color: #f59e0b; }
+        .article-card.score-low { border-left-color: #94a3b8; }
+
+        .article-title { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+        .article-title a { color: #0f766e; text-decoration: none; }
+        .article-title a:hover { text-decoration: underline; }
+        .article-meta { font-size: 12px; color: #94a3b8; margin-bottom: 8px; display: flex; gap: 12px; }
+        .article-summary { font-size: 14px; color: #475569; line-height: 1.6; }
+        .article-influencers { margin-top: 8px; }
+        .influencer-tag {
+            display: inline-block; padding: 2px 10px; border-radius: 12px;
+            font-size: 11px; background: #ecfdf5; color: #0f766e; margin: 2px;
+        }
+
+        .score-badge {
+            display: inline-block; padding: 2px 8px; border-radius: 4px;
+            font-size: 11px; font-weight: 700; color: white;
+        }
+        .score-badge.high { background: #22c55e; }
+        .score-badge.mid { background: #f59e0b; }
+        .score-badge.low { background: #94a3b8; }
+
+        /* Influencers sidebar */
+        .influencers-panel {
+            background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+        .influencers-panel h3 { font-size: 16px; color: #064e3b; margin-bottom: 12px; }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center; padding: 80px 20px; color: #94a3b8;
+        }
+        .empty-state h2 { font-size: 24px; margin-bottom: 8px; color: #475569; }
+
+        /* Toast notification */
+        .toast {
+            position: fixed; bottom: 24px; right: 24px; padding: 16px 24px;
+            background: #064e3b; color: white; border-radius: 8px;
+            font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            transform: translateY(100px); opacity: 0; transition: all 0.3s;
+            z-index: 1000;
+        }
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.error { background: #dc2626; }
+        .toast.success { background: #16a34a; }
+
+        /* Loading spinner */
+        .spinner {
+            display: inline-block; width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,0.3); border-top-color: white;
+            border-radius: 50%; animation: spin 0.8s linear infinite;
+            margin-right: 8px; vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>Healthcare Intelligence Digest</h1>
+            <p>Curated by Korcomptenz Sales Ops</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-primary" id="fetchBtn" onclick="fetchArticles()">
+                Fetch & Analyze Articles
+            </button>
+            <button class="btn btn-hubspot" id="hubspotBtn" onclick="pushToHubSpot()" disabled>
+                Push to HubSpot Email
+            </button>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <div class="stats">
+            <div class="stat"><span class="stat-num" id="totalCount">0</span> articles</div>
+            <div class="stat"><span class="stat-num" id="segmentCount">0</span> segments</div>
+            <div class="stat"><span class="stat-num" id="influencerCount">0</span> influencers</div>
+        </div>
+        <div id="lastFetch">Not yet fetched</div>
+    </div>
+
+    <div class="progress-container" id="progressContainer">
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-text" id="progressText">Starting...</div>
+    </div>
+
+    <div class="filters" id="filtersBar" style="display:none;">
+        <span class="filter-label">Filter by segment:</span>
+        <span class="filter-chip active" data-segment="all" onclick="filterSegment('all', this)">All</span>
+    </div>
+
+    <div class="content" id="mainContent">
+        <div class="empty-state">
+            <h2>Ready to curate</h2>
+            <p>Click "Fetch & Analyze Articles" to pull the latest articles from 16 healthcare publications</p>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        let allArticles = [];
+
+        async function fetchArticles() {
+            const btn = document.getElementById('fetchBtn');
+            const progress = document.getElementById('progressContainer');
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Fetching...';
+            progress.style.display = 'block';
+            progressFill.style.width = '10%';
+            progressText.textContent = 'Fetching RSS feeds from healthcare sources...';
+
+            try {
+                // Step 1: Fetch feeds
+                const fetchResp = await fetch('/api/fetch');
+                const fetchData = await fetchResp.json();
+
+                if (!fetchData.success) {
+                    throw new Error(fetchData.error || 'Failed to fetch feeds');
+                }
+
+                progressFill.style.width = '40%';
+                progressText.textContent = `Fetched ${fetchData.count} articles. Analyzing with AI (this may take a few minutes with local LLM)...`;
+
+                // Step 2: Score with AI
+                const scoreResp = await fetch('/api/score');
+                const scoreData = await scoreResp.json();
+
+                if (!scoreData.success) {
+                    throw new Error(scoreData.error || 'Failed to score articles');
+                }
+
+                progressFill.style.width = '100%';
+                progressText.textContent = 'Done!';
+
+                allArticles = scoreData.articles;
+                renderArticles(allArticles);
+                updateStats(allArticles);
+                buildFilters(allArticles);
+
+                document.getElementById('hubspotBtn').disabled = false;
+                document.getElementById('lastFetch').textContent = 'Last fetched: just now';
+
+                showToast(`${allArticles.length} relevant articles curated!`, 'success');
+
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Fetch & Analyze Articles';
+                setTimeout(() => { progress.style.display = 'none'; }, 2000);
+            }
+        }
+
+        function renderArticles(articles) {
+            const content = document.getElementById('mainContent');
+            if (articles.length === 0) {
+                content.innerHTML = '<div class="empty-state"><h2>No relevant articles found</h2><p>Try lowering the relevance threshold in config.py</p></div>';
+                return;
+            }
+
+            // Group by segment
+            const groups = {};
+            articles.forEach(a => {
+                if (!groups[a.segment]) groups[a.segment] = [];
+                groups[a.segment].push(a);
+            });
+
+            let html = '';
+
+            // Influencers panel
+            const allInfluencers = [...new Set(articles.flatMap(a => a.influencers || []))];
+            if (allInfluencers.length > 0) {
+                html += '<div class="influencers-panel"><h3>Movers & Shakers This Period</h3>';
+                allInfluencers.slice(0, 25).forEach(inf => {
+                    html += `<span class="influencer-tag">${inf}</span>`;
+                });
+                html += '</div>';
+            }
+
+            for (const [segment, arts] of Object.entries(groups)) {
+                html += `<div class="segment-group" data-segment="${segment}">`;
+                html += `<h2 class="segment-title">${segment}</h2>`;
+                arts.forEach(art => {
+                    const scoreClass = art.relevance_score >= 8 ? 'high' : art.relevance_score >= 6 ? 'mid' : 'low';
+                    let influencerHtml = '';
+                    if (art.influencers && art.influencers.length > 0) {
+                        influencerHtml = '<div class="article-influencers">';
+                        art.influencers.forEach(inf => {
+                            influencerHtml += `<span class="influencer-tag">${inf}</span>`;
+                        });
+                        influencerHtml += '</div>';
+                    }
+
+                    html += `
+                    <div class="article-card score-${scoreClass}">
+                        <div class="article-title"><a href="${art.link}" target="_blank">${art.title}</a></div>
+                        <div class="article-meta">
+                            <span>${art.source}</span>
+                            <span>${art.published_str}</span>
+                            <span class="score-badge ${scoreClass}">${art.relevance_score}/10</span>
+                        </div>
+                        <div class="article-summary">${art.ai_summary || art.summary}</div>
+                        ${influencerHtml}
+                    </div>`;
+                });
+                html += '</div>';
+            }
+
+            content.innerHTML = html;
+        }
+
+        function updateStats(articles) {
+            document.getElementById('totalCount').textContent = articles.length;
+            const segments = [...new Set(articles.map(a => a.segment))];
+            document.getElementById('segmentCount').textContent = segments.length;
+            const influencers = [...new Set(articles.flatMap(a => a.influencers || []))];
+            document.getElementById('influencerCount').textContent = influencers.length;
+        }
+
+        function buildFilters(articles) {
+            const bar = document.getElementById('filtersBar');
+            const segments = [...new Set(articles.map(a => a.segment))];
+            bar.style.display = 'flex';
+            let html = '<span class="filter-label">Filter by segment:</span>';
+            html += '<span class="filter-chip active" data-segment="all" onclick="filterSegment(\'all\', this)">All</span>';
+            segments.forEach(seg => {
+                html += `<span class="filter-chip" data-segment="${seg}" onclick="filterSegment('${seg}', this)">${seg}</span>`;
+            });
+            bar.innerHTML = html;
+        }
+
+        function filterSegment(segment, chip) {
+            document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+
+            if (segment === 'all') {
+                renderArticles(allArticles);
+            } else {
+                renderArticles(allArticles.filter(a => a.segment === segment));
+            }
+        }
+
+        async function pushToHubSpot() {
+            const btn = document.getElementById('hubspotBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Pushing...';
+
+            try {
+                const resp = await fetch('/api/hubspot', { method: 'POST' });
+                const data = await resp.json();
+
+                if (data.success) {
+                    showToast('Draft marketing email created in HubSpot!', 'success');
+                } else {
+                    throw new Error(data.message || 'Failed to push to HubSpot');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Push to HubSpot Email';
+            }
+        }
+
+        function showToast(message, type) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast ' + type + ' show';
+            setTimeout(() => { toast.className = 'toast'; }, 4000);
+        }
+    </script>
+</body>
+</html>
