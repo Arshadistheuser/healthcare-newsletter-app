@@ -135,7 +135,7 @@ Customer-centric approach (#FocusOnYou). Global delivery (US, India, UAE, Canada
 
 # ── Ollama Settings (local LLM) ──────────────────────────────
 # Set USE_OLLAMA=true to use local Ollama instead of Groq cloud
-USE_OLLAMA = os.getenv("USE_OLLAMA", "true").lower() == "true"
+USE_OLLAMA = os.getenv("USE_OLLAMA", "false").lower() == "true"
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 # Recommended: qwen2.5:7b or llama3.1:8b for 16GB RAM systems
 # Pull with: ollama pull qwen2.5:7b
