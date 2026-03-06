@@ -4,6 +4,7 @@ Run with: python app.py
 Open: http://localhost:<PORT>
 """
 
+import traceback
 from flask import Flask, render_template, jsonify
 from config import SECRET_KEY, DEBUG, PORT
 from fetcher import fetch_all_feeds
@@ -35,7 +36,9 @@ def api_fetch():
             "message": f"Fetched {len(articles)} articles from RSS feeds.",
         })
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        tb = traceback.format_exc()
+        print(tb)
+        return jsonify({"success": False, "error": str(e), "traceback": tb}), 500
 
 
 @app.route("/api/score")
@@ -50,7 +53,6 @@ def api_score():
         scored = score_and_summarize(raw)
         current_articles["scored"] = scored
 
-        # Serialize for JSON response
         articles_json = []
         for art in scored:
             articles_json.append({
@@ -71,7 +73,9 @@ def api_score():
             "articles": articles_json,
         })
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        tb = traceback.format_exc()
+        print(tb)
+        return jsonify({"success": False, "error": str(e), "traceback": tb}), 500
 
 
 @app.route("/api/hubspot", methods=["POST"])
@@ -86,7 +90,36 @@ def api_hubspot():
         result = create_draft_email(scored)
         return jsonify(result)
     except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
+        tb = traceback.format_exc()
+        print(tb)
+        return jsonify({"success": False, "message": str(e), "traceback": tb}), 500
+
+
+@app.route("/api/debug")
+def api_debug():
+    """Debug endpoint — tests Groq connection and shows config."""
+    import os
+    from config import USE_OLLAMA, GROQ_API_KEY, OLLAMA_MODEL
+    result = {
+        "USE_OLLAMA": USE_OLLAMA,
+        "OLLAMA_MODEL": OLLAMA_MODEL,
+        "GROQ_API_KEY_SET": bool(GROQ_API_KEY),
+        "raw_articles_in_memory": len(current_articles["raw"]),
+    }
+    # Quick Groq test
+    if not USE_OLLAMA and GROQ_API_KEY:
+        try:
+            from groq import Groq
+            client = Groq(api_key=GROQ_API_KEY)
+            resp = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": "Say OK"}],
+                max_tokens=5,
+            )
+            result["groq_test"] = resp.choices[0].message.content
+        except Exception as e:
+            result["groq_error"] = str(e)
+    return jsonify(result)
 
 
 if __name__ == "__main__":
