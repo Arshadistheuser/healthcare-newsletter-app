@@ -8,7 +8,6 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #f0fdf4; color: #1a202c; }
 
-        /* Header */
         .header {
             background: linear-gradient(135deg, #064e3b 0%, #0f766e 100%);
             color: white; padding: 24px 32px;
@@ -27,7 +26,6 @@
         .btn-hubspot:hover { background: #e5603d; }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        /* Status bar */
         .status-bar {
             background: #fff; padding: 12px 32px; border-bottom: 1px solid #e2e8f0;
             display: flex; justify-content: space-between; align-items: center;
@@ -37,13 +35,18 @@
         .stat { display: flex; align-items: center; gap: 6px; }
         .stat-num { font-weight: 700; color: #064e3b; font-size: 18px; }
 
-        /* Progress */
         .progress-container { display: none; padding: 16px 32px; background: #ecfdf5; }
         .progress-bar { height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
         .progress-fill { height: 100%; background: #14b8a6; border-radius: 3px; transition: width 0.5s; width: 0%; }
+        .progress-fill.indeterminate {
+            width: 40%; animation: slide 1.5s ease-in-out infinite;
+        }
+        @keyframes slide {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(350%); }
+        }
         .progress-text { margin-top: 8px; font-size: 13px; color: #475569; }
 
-        /* Filters */
         .filters {
             padding: 16px 32px; background: #fff; border-bottom: 1px solid #e2e8f0;
             display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
@@ -56,17 +59,14 @@
         .filter-chip.active { background: #0f766e; color: white; border-color: #0f766e; }
         .filter-label { font-size: 13px; color: #64748b; font-weight: 600; }
 
-        /* Main content */
         .content { max-width: 1200px; margin: 0 auto; padding: 24px 32px; }
 
-        /* Segment groups */
         .segment-group { margin-bottom: 32px; }
         .segment-title {
             font-size: 18px; font-weight: 700; color: #064e3b;
             border-bottom: 2px solid #14b8a6; padding-bottom: 8px; margin-bottom: 16px;
         }
 
-        /* Article cards */
         .article-card {
             background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 12px;
             border-left: 4px solid #22c55e; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
@@ -96,32 +96,25 @@
         .score-badge.mid { background: #f59e0b; }
         .score-badge.low { background: #94a3b8; }
 
-        /* Influencers sidebar */
         .influencers-panel {
             background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 24px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.06);
         }
         .influencers-panel h3 { font-size: 16px; color: #064e3b; margin-bottom: 12px; }
 
-        /* Empty state */
-        .empty-state {
-            text-align: center; padding: 80px 20px; color: #94a3b8;
-        }
+        .empty-state { text-align: center; padding: 80px 20px; color: #94a3b8; }
         .empty-state h2 { font-size: 24px; margin-bottom: 8px; color: #475569; }
 
-        /* Toast notification */
         .toast {
             position: fixed; bottom: 24px; right: 24px; padding: 16px 24px;
             background: #064e3b; color: white; border-radius: 8px;
             font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            transform: translateY(100px); opacity: 0; transition: all 0.3s;
-            z-index: 1000;
+            transform: translateY(100px); opacity: 0; transition: all 0.3s; z-index: 1000;
         }
         .toast.show { transform: translateY(0); opacity: 1; }
         .toast.error { background: #dc2626; }
         .toast.success { background: #16a34a; }
 
-        /* Loading spinner */
         .spinner {
             display: inline-block; width: 16px; height: 16px;
             border: 2px solid rgba(255,255,255,0.3); border-top-color: white;
@@ -138,7 +131,7 @@
             <p>Curated by Korcomptenz Sales Ops</p>
         </div>
         <div class="header-actions">
-            <button class="btn btn-primary" id="fetchBtn" onclick="fetchArticles()">
+            <button class="btn btn-primary" id="fetchBtn" onclick="startFetch()">
                 Fetch & Analyze Articles
             </button>
             <button class="btn btn-hubspot" id="hubspotBtn" onclick="pushToHubSpot()" disabled>
@@ -157,7 +150,7 @@
     </div>
 
     <div class="progress-container" id="progressContainer">
-        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-bar"><div class="progress-fill indeterminate" id="progressFill"></div></div>
         <div class="progress-text" id="progressText">Starting...</div>
     </div>
 
@@ -169,7 +162,7 @@
     <div class="content" id="mainContent">
         <div class="empty-state">
             <h2>Ready to curate</h2>
-            <p>Click "Fetch & Analyze Articles" to pull the latest articles from 16 healthcare publications</p>
+            <p>Click "Fetch & Analyze Articles" to pull the latest articles from 15 healthcare publications</p>
         </div>
     </div>
 
@@ -177,58 +170,79 @@
 
     <script>
         let allArticles = [];
+        let pollInterval = null;
 
-        async function fetchArticles() {
+        async function startFetch() {
             const btn = document.getElementById('fetchBtn');
             const progress = document.getElementById('progressContainer');
             const progressFill = document.getElementById('progressFill');
             const progressText = document.getElementById('progressText');
 
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner"></span> Fetching...';
+            btn.innerHTML = '<span class="spinner"></span> Running...';
             progress.style.display = 'block';
-            progressFill.style.width = '10%';
+            progressFill.className = 'progress-fill indeterminate';
             progressText.textContent = 'Fetching RSS feeds from healthcare sources...';
 
             try {
-                // Step 1: Fetch feeds
-                const fetchResp = await fetch('/api/fetch');
-                const fetchData = await fetchResp.json();
+                // Kick off background processing
+                const resp = await fetch('/api/fetch');
+                const data = await resp.json();
+                if (!data.success) throw new Error(data.error || 'Failed to start');
 
-                if (!fetchData.success) {
-                    throw new Error(fetchData.error || 'Failed to fetch feeds');
-                }
-
-                progressFill.style.width = '40%';
-                progressText.textContent = `Fetched ${fetchData.count} articles. Analyzing with AI (this may take a few minutes with local LLM)...`;
-
-                // Step 2: Score with AI
-                const scoreResp = await fetch('/api/score');
-                const scoreData = await scoreResp.json();
-
-                if (!scoreData.success) {
-                    throw new Error(scoreData.error || 'Failed to score articles');
-                }
-
-                progressFill.style.width = '100%';
-                progressText.textContent = 'Done!';
-
-                allArticles = scoreData.articles;
-                renderArticles(allArticles);
-                updateStats(allArticles);
-                buildFilters(allArticles);
-
-                document.getElementById('hubspotBtn').disabled = false;
-                document.getElementById('lastFetch').textContent = 'Last fetched: just now';
-
-                showToast(`${allArticles.length} relevant articles curated!`, 'success');
+                // Poll for results
+                pollInterval = setInterval(pollStatus, 3000);
 
             } catch (err) {
                 showToast('Error: ' + err.message, 'error');
-            } finally {
                 btn.disabled = false;
                 btn.innerHTML = 'Fetch & Analyze Articles';
-                setTimeout(() => { progress.style.display = 'none'; }, 2000);
+                progress.style.display = 'none';
+            }
+        }
+
+        async function pollStatus() {
+            try {
+                const resp = await fetch('/api/status');
+                const data = await resp.json();
+                const progressText = document.getElementById('progressText');
+                const progressFill = document.getElementById('progressFill');
+                const btn = document.getElementById('fetchBtn');
+
+                progressText.textContent = data.message || data.status;
+
+                if (data.status === 'fetching') {
+                    progressText.textContent = `Fetching RSS feeds... (${data.raw_count} articles so far)`;
+                } else if (data.status === 'scoring') {
+                    progressText.textContent = `AI analyzing ${data.raw_count} articles for KOR relevance...`;
+                } else if (data.status === 'ready') {
+                    clearInterval(pollInterval);
+                    progressFill.className = 'progress-fill';
+                    progressFill.style.width = '100%';
+                    progressText.textContent = 'Done!';
+
+                    allArticles = data.articles || [];
+                    renderArticles(allArticles);
+                    updateStats(allArticles);
+                    buildFilters(allArticles);
+
+                    document.getElementById('hubspotBtn').disabled = false;
+                    document.getElementById('lastFetch').textContent = 'Last fetched: just now';
+                    btn.disabled = false;
+                    btn.innerHTML = 'Fetch & Analyze Articles';
+
+                    showToast(`${allArticles.length} relevant articles curated!`, 'success');
+                    setTimeout(() => { document.getElementById('progressContainer').style.display = 'none'; }, 2000);
+
+                } else if (data.status === 'error') {
+                    clearInterval(pollInterval);
+                    btn.disabled = false;
+                    btn.innerHTML = 'Fetch & Analyze Articles';
+                    document.getElementById('progressContainer').style.display = 'none';
+                    showToast('Error: ' + (data.error || data.message), 'error');
+                }
+            } catch (err) {
+                // ignore transient poll errors
             }
         }
 
@@ -239,7 +253,6 @@
                 return;
             }
 
-            // Group by segment
             const groups = {};
             articles.forEach(a => {
                 if (!groups[a.segment]) groups[a.segment] = [];
@@ -247,8 +260,6 @@
             });
 
             let html = '';
-
-            // Influencers panel
             const allInfluencers = [...new Set(articles.flatMap(a => a.influencers || []))];
             if (allInfluencers.length > 0) {
                 html += '<div class="influencers-panel"><h3>Movers & Shakers This Period</h3>';
@@ -266,12 +277,9 @@
                     let influencerHtml = '';
                     if (art.influencers && art.influencers.length > 0) {
                         influencerHtml = '<div class="article-influencers">';
-                        art.influencers.forEach(inf => {
-                            influencerHtml += `<span class="influencer-tag">${inf}</span>`;
-                        });
+                        art.influencers.forEach(inf => { influencerHtml += `<span class="influencer-tag">${inf}</span>`; });
                         influencerHtml += '</div>';
                     }
-
                     html += `
                     <div class="article-card score-${scoreClass}">
                         <div class="article-title"><a href="${art.link}" target="_blank">${art.title}</a></div>
@@ -286,16 +294,13 @@
                 });
                 html += '</div>';
             }
-
             content.innerHTML = html;
         }
 
         function updateStats(articles) {
             document.getElementById('totalCount').textContent = articles.length;
-            const segments = [...new Set(articles.map(a => a.segment))];
-            document.getElementById('segmentCount').textContent = segments.length;
-            const influencers = [...new Set(articles.flatMap(a => a.influencers || []))];
-            document.getElementById('influencerCount').textContent = influencers.length;
+            document.getElementById('segmentCount').textContent = [...new Set(articles.map(a => a.segment))].length;
+            document.getElementById('influencerCount').textContent = [...new Set(articles.flatMap(a => a.influencers || []))].length;
         }
 
         function buildFilters(articles) {
@@ -313,25 +318,18 @@
         function filterSegment(segment, chip) {
             document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
             chip.classList.add('active');
-
-            if (segment === 'all') {
-                renderArticles(allArticles);
-            } else {
-                renderArticles(allArticles.filter(a => a.segment === segment));
-            }
+            renderArticles(segment === 'all' ? allArticles : allArticles.filter(a => a.segment === segment));
         }
 
         async function pushToHubSpot() {
             const btn = document.getElementById('hubspotBtn');
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner"></span> Pushing...';
-
             try {
                 const resp = await fetch('/api/hubspot', { method: 'POST' });
                 const data = await resp.json();
-
                 if (data.success) {
-                    showToast('Draft marketing email created in HubSpot!', 'success');
+                    showToast('Draft email created in HubSpot!', 'success');
                 } else {
                     throw new Error(data.message || 'Failed to push to HubSpot');
                 }
@@ -347,7 +345,7 @@
             const toast = document.getElementById('toast');
             toast.textContent = message;
             toast.className = 'toast ' + type + ' show';
-            setTimeout(() => { toast.className = 'toast'; }, 4000);
+            setTimeout(() => { toast.className = 'toast'; }, 5000);
         }
     </script>
 </body>

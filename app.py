@@ -2,9 +2,13 @@
 Healthcare Intelligence Digest — Main Flask Application
 Run with: python app.py
 Open: http://localhost:<PORT>
+
+Architecture note: AI scoring runs in a background thread to avoid
+Render's 30-second proxy timeout. Frontend polls /api/status for results.
 """
 
 import traceback
+import threading
 from flask import Flask, render_template, jsonify
 from config import SECRET_KEY, DEBUG, PORT
 from fetcher import fetch_all_feeds
@@ -14,8 +18,14 @@ from hubspot_email import create_draft_email
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
 
-# In-memory store for the current session's articles
-current_articles = {"raw": [], "scored": []}
+# In-memory store for the current session
+state = {
+    "status": "idle",        # idle | fetching | scoring | ready | error
+    "message": "",
+    "raw": [],
+    "scored": [],
+    "error": "",
+}
 
 
 @app.route("/")
@@ -25,36 +35,51 @@ def dashboard():
 
 @app.route("/api/fetch")
 def api_fetch():
-    """Fetch articles from all RSS feeds."""
-    try:
-        print("\n[1/2] Fetching RSS feeds...")
-        articles = fetch_all_feeds(days_back=14)
-        current_articles["raw"] = articles
-        return jsonify({
-            "success": True,
-            "count": len(articles),
-            "message": f"Fetched {len(articles)} articles from RSS feeds.",
-        })
-    except Exception as e:
-        tb = traceback.format_exc()
-        print(tb)
-        return jsonify({"success": False, "error": str(e), "traceback": tb}), 500
+    """Fetch articles from RSS feeds then kick off AI scoring in background."""
+    if state["status"] in ("fetching", "scoring"):
+        return jsonify({"success": False, "error": "Already running. Please wait."})
+
+    def run():
+        try:
+            state["status"] = "fetching"
+            state["error"] = ""
+            state["scored"] = []
+            print("\n[1/2] Fetching RSS feeds...")
+            articles = fetch_all_feeds(days_back=14)
+            state["raw"] = articles
+            state["message"] = f"Fetched {len(articles)} articles. Scoring with AI..."
+
+            state["status"] = "scoring"
+            print("\n[2/2] Scoring articles with AI...")
+            scored = score_and_summarize(articles)
+            state["scored"] = scored
+            state["status"] = "ready"
+            state["message"] = f"Done! {len(scored)} relevant articles curated."
+            print(f"  Complete: {len(scored)} articles ready.")
+        except Exception as e:
+            state["status"] = "error"
+            state["error"] = str(e)
+            state["message"] = f"Error: {e}"
+            print(traceback.format_exc())
+
+    threading.Thread(target=run, daemon=True).start()
+    return jsonify({"success": True, "message": "Started. Poll /api/status for progress."})
 
 
-@app.route("/api/score")
-def api_score():
-    """Score and summarize articles using AI."""
-    try:
-        raw = current_articles["raw"]
-        if not raw:
-            return jsonify({"success": False, "error": "No articles fetched yet. Click Fetch first."})
+@app.route("/api/status")
+def api_status():
+    """Poll this endpoint for fetch+score progress and results."""
+    response = {
+        "status": state["status"],
+        "message": state["message"],
+        "error": state["error"],
+        "raw_count": len(state["raw"]),
+        "scored_count": len(state["scored"]),
+    }
 
-        print("\n[2/2] Scoring articles with AI...")
-        scored = score_and_summarize(raw)
-        current_articles["scored"] = scored
-
+    if state["status"] == "ready" and state["scored"]:
         articles_json = []
-        for art in scored:
+        for art in state["scored"]:
             articles_json.append({
                 "title": art["title"],
                 "link": art["link"],
@@ -66,23 +91,16 @@ def api_score():
                 "relevance_score": art["relevance_score"],
                 "influencers": art["influencers"],
             })
+        response["articles"] = articles_json
 
-        return jsonify({
-            "success": True,
-            "count": len(articles_json),
-            "articles": articles_json,
-        })
-    except Exception as e:
-        tb = traceback.format_exc()
-        print(tb)
-        return jsonify({"success": False, "error": str(e), "traceback": tb}), 500
+    return jsonify(response)
 
 
 @app.route("/api/hubspot", methods=["POST"])
 def api_hubspot():
     """Push curated newsletter to HubSpot as a draft marketing email."""
     try:
-        scored = current_articles["scored"]
+        scored = state["scored"]
         if not scored:
             return jsonify({"success": False, "message": "No scored articles. Fetch and score first."})
 
@@ -92,34 +110,21 @@ def api_hubspot():
     except Exception as e:
         tb = traceback.format_exc()
         print(tb)
-        return jsonify({"success": False, "message": str(e), "traceback": tb}), 500
+        return jsonify({"success": False, "message": str(e)}), 500
 
 
 @app.route("/api/debug")
 def api_debug():
-    """Debug endpoint — tests Groq connection and shows config."""
-    import os
+    """Debug endpoint."""
     from config import USE_OLLAMA, GROQ_API_KEY, OLLAMA_MODEL
-    result = {
+    return jsonify({
         "USE_OLLAMA": USE_OLLAMA,
         "OLLAMA_MODEL": OLLAMA_MODEL,
         "GROQ_API_KEY_SET": bool(GROQ_API_KEY),
-        "raw_articles_in_memory": len(current_articles["raw"]),
-    }
-    # Quick Groq test
-    if not USE_OLLAMA and GROQ_API_KEY:
-        try:
-            from groq import Groq
-            client = Groq(api_key=GROQ_API_KEY)
-            resp = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[{"role": "user", "content": "Say OK"}],
-                max_tokens=5,
-            )
-            result["groq_test"] = resp.choices[0].message.content
-        except Exception as e:
-            result["groq_error"] = str(e)
-    return jsonify(result)
+        "state_status": state["status"],
+        "raw_count": len(state["raw"]),
+        "scored_count": len(state["scored"]),
+    })
 
 
 if __name__ == "__main__":
